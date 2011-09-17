@@ -47,7 +47,7 @@ instance FromJSON Person where
                                 <*> v .:| ("placesLived", [])
                                 <*> v .:| ("languagesSpoken", [])
                                 <*> v .:? "hasApp"
-  parseJSON _          = fail "Inva"
+  parseJSON v          = typeMismatch "Person" v
 
 instance FromJSON Day where
   parseJSON (String str) = pure . read . unpack $ str
