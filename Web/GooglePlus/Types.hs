@@ -6,8 +6,24 @@ import           Control.Applicative ((<$>), (<*>), pure)
 import           Data.Aeson
 import qualified Data.Map as M
 import           Data.Time.Calendar (Day(..))
+import           Data.Time.LocalTime (ZonedTime(..))
+import           Data.Time.RFC3339 (readRFC3339)
 import           Data.Text (Text, unpack, append)
 import           Network.URL
+
+data Activity = Activity { activityPlaceholder :: Bool,
+                           activityTitle :: Text,
+                           activityPublished :: ZonedTime,
+                           activityTitle :: Text,
+                           activityTitle :: Text,
+                           activityTitle :: Text,
+                           activityTitle :: Text,
+                           activityTitle :: Text,
+                           activityTitle :: Text,
+                           activityTitle :: Text,
+                           activityTitle :: Text,
+                           
+  }
 
 data Person = Person { personId                 :: Text,
                        personDisplayName        :: Text,
