@@ -128,9 +128,9 @@ instance FromJSON ActivityObject where
                                         <*> v .:  "id"
                                         <*> v .:  "objectType"
                                         <*> v .:  "originalContent"
-                                        <*> v `parseTotalItems` "plusOners" --TODO: parse out object
-                                        <*> v `parseTotalItems` "plusReplies" --TODO: parse out object
-                                        <*> v `parseTotalItems` "plusResharers" --TODO: parse out object
+                                        <*> v `parseTotalItems` "plusOners"
+                                        <*> v `parseTotalItems` "plusReplies"
+                                        <*> v `parseTotalItems` "plusResharers"
                                         <*> v .:  "url"
     where parseTotalItems v key = maybe (fail "failed to find totalItems") parseJSON $ totalItems' v key
           totalItems' v key = case M.lookup key v of
@@ -302,11 +302,16 @@ instance FromJSON PersonName where
                                     <*> v .: "middleName"
   parseJSON v          = typeMismatch "PersonName" v
 
---TODO: maybe type, maybe url, maybe width
-data Image = Image { imageURL :: URL } deriving (Show, Eq)
+data Image = Image { imageURL :: URL,
+                     imageType :: Maybe Text,
+                     imageWidth :: Maybe Integer,
+                     imageHeight :: Maybe Integer } deriving (Show, Eq)
 
 instance FromJSON Image where
-  parseJSON (Object v) = Image <$> v .: "url"
+  parseJSON (Object v) = Image <$> v .:  "url"
+                               <*> v .:? "type"
+                               <*> v .:? "width"
+                               <*> v .:? "height"
   parseJSON v          = typeMismatch "Image" v
 
 data Email = Email { emailPrimary      :: Bool,
