@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Web.GooglePlus (getPerson) where
+module Web.GooglePlus (getPerson, getActivity, getActivities) where
 
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
@@ -8,6 +8,7 @@ import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader (asks)
 import           Data.Aeson (json, FromJSON, fromJSON, Result(..))
 import           Data.Attoparsec.Lazy (parse, eitherResult)
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import           Data.ByteString (append)
@@ -16,13 +17,34 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Network.HTTP.Enumerator
 import           Network.HTTP.Types (Ascii, Query, QueryItem)
 
+--TODO: generalize
 getPerson :: PersonID -> GooglePlusM (Either Text Person)
 getPerson pid = withEnv $ \auth -> do
   resp <- doGet auth pth []
   return $ handleResponse resp
-  where pth = case pid of
-                PersonID i -> append "/plus/v1/people/" $ encodeUtf8 i
-                Me         -> "/plus/v1/people/me"
+  where pth = personIdPath pid
+
+getActivity :: ID -> GooglePlusM (Either Text Activity)
+getActivity aid = withEnv $ \auth -> do
+  resp <- doGet auth pth []
+  return $ handleResponse resp
+  where pth = append "/plus/v1/activities/" $ encodeUtf8 aid
+
+--TODO: pagetoken
+getActivities :: PersonID -> Text -> GooglePlusM (Either Text Activity)
+getActivities pid coll = withEnv $ \auth -> do
+  resp <- doGet auth pth []
+  return $ handleResponse resp
+  where pth = append pidP actP
+        pidP = personIdPath pid
+        actP = append "/activities/" $ encodeUtf8 coll
+
+
+---- Helpers
+
+personIdPath :: PersonID -> ByteString
+personIdPath (PersonID i) = append "/plus/v1/activities/" $ encodeUtf8 i
+personIdPath Me           = "/plus/v1/activities/me"
 
 doGet :: GooglePlusAuth -> Ascii -> Query -> GooglePlusM (Int, LBS.ByteString)
 doGet auth pth q = liftIO $ withManager $ \manager -> do
