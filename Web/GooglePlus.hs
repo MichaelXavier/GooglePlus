@@ -17,30 +17,28 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Network.HTTP.Enumerator
 import           Network.HTTP.Types (Ascii, Query, QueryItem)
 
---TODO: generalize
 getPerson :: PersonID -> GooglePlusM (Either Text Person)
-getPerson pid = withEnv $ \auth -> do
-  resp <- doGet auth pth []
-  return $ handleResponse resp
+getPerson pid = genericGet pth []
   where pth = personIdPath pid
 
+
 getActivity :: ID -> GooglePlusM (Either Text Activity)
-getActivity aid = withEnv $ \auth -> do
-  resp <- doGet auth pth []
-  return $ handleResponse resp
+getActivity aid = genericGet pth []
   where pth = append "/plus/v1/activities/" $ encodeUtf8 aid
 
 --TODO: pagetoken
 getActivityFeed :: PersonID -> ActivityCollection -> GooglePlusM (Either Text ActivityFeed)
-getActivityFeed pid coll = withEnv $ \auth -> do
-  resp <- doGet auth pth []
-  return $ handleResponse resp
-  where pth = append pidP actP
+getActivityFeed pid coll = genericGet pth []
+  where pth  = append pidP actP
         pidP = personIdPath pid
         actP = append "/activities/" $ collectionPath coll
 
-
 ---- Helpers
+
+genericGet :: FromJSON a => Ascii -> Query -> GooglePlusM (Either Text a)
+genericGet pth qs = withEnv $ \auth -> do
+  resp <- doGet auth pth []
+  return $ handleResponse resp
 
 collectionPath :: ActivityCollection -> ByteString
 collectionPath PublicCollection = "public"
