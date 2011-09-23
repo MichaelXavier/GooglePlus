@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Web.GooglePlus.Types (Person(..),
                              PersonID(..),
+                             ActivityCollection(..),
                              ID,
                              Actor(..),
                              Verb(..),
@@ -12,6 +13,7 @@ module Web.GooglePlus.Types (Person(..),
                              AccessItemType(..),
                              Geocode(..),
                              Activity(..),
+                             ActivityFeed(..),
                              Attachment(..),
                              AttachmentType(..),
                              Embed(..),
@@ -40,7 +42,22 @@ import           Network.URL
 
 type ID = Text
 
-data Activity = Activity { activityPlaceholder     :: Bool,
+data ActivityCollection = PublicCollection deriving (Show, Eq)
+
+data ActivityFeed = ActivityFeed { activityFeedTitle   :: Text,
+                                   activityFeedUpdated :: ZonedTime,
+                                   activityFeedId      :: ID,
+                                   activityFeedItems   :: [Activity] 
+                                   } deriving (Show, Eq)
+
+instance FromJSON ActivityFeed where
+  parseJSON (Object v) = ActivityFeed <$> v .: "title"
+                                      <*> v .: "updated"
+                                      <*> v .: "id"
+                                      <*> v .: "items"
+  parseJSON v          = typeMismatch "ActivityFeed" v
+
+data Activity = Activity { activityPlaceholder     :: Maybe Bool,
                            activityTitle           :: Text,
                            activityPublished       :: ZonedTime,
                            activityUpdated         :: ZonedTime,
@@ -49,35 +66,36 @@ data Activity = Activity { activityPlaceholder     :: Bool,
                            activityActor           :: Actor,
                            activityVerb            :: Verb,
                            activityObject          :: ActivityObject,
-                           activityAnnotation      :: Text,
-                           activityCrosspostSource :: Text, --ID
+                           activityAnnotation      :: Maybe Text,
+                           activityCrosspostSource :: Maybe ID, --ID
                            activityProvider        :: Provider,
                            activityAccess          :: Access,
-                           activityGeocode         :: Geocode,
-                           activityAddress         :: Text,
-                           activityRadius          :: Integer, -- meters
-                           activityPlaceId         :: ID,
-                           activityPlaceName       :: Text } deriving (Show, Eq)
+                           activityGeocode         :: Maybe Geocode,
+                           activityAddress         :: Maybe Text,
+                           activityRadius          :: Maybe Integer, -- meters
+                           activityPlaceId         :: Maybe ID,
+                           activityPlaceName       :: Maybe Text } deriving (Show, Eq)
 
+--TODO: activities
 instance FromJSON Activity where
-  parseJSON (Object v) = Activity <$> v .:  "placeholder"
+  parseJSON (Object v) = Activity <$> v .:? "placeholder"
                                   <*> v .:  "title"
                                   <*> v .:  "published"
                                   <*> v .:  "updated"
                                   <*> v .:  "id"
                                   <*> v .:  "url"
                                   <*> v .:  "actor"
-                                  <*> v .:  "verb"
+                                  <*> v .:| ("verb", Post)
                                   <*> v .:  "object"
-                                  <*> v .:  "annotation"
-                                  <*> v .:  "crosspostSource"
+                                  <*> v .:? "annotation"
+                                  <*> v .:? "crosspostSource"
                                   <*> v .:  "provider"
                                   <*> v .:  "access"
-                                  <*> v .:  "geocode"
-                                  <*> v .:  "address"
-                                  <*> v .:  "radius"
-                                  <*> v .:  "placeId"
-                                  <*> v .:  "placeName"
+                                  <*> v .:? "geocode"
+                                  <*> v .:? "address"
+                                  <*> v .:? "radius"
+                                  <*> v .:? "placeId"
+                                  <*> v .:? "placeName"
 
 instance Eq ZonedTime where
   a == b = zonedTimeToUTC a == zonedTimeToUTC b
@@ -110,29 +128,29 @@ instance FromJSON Verb where
   parseJSON (String "share")   = pure Share
   parseJSON v                  = typeMismatch "Verb" v
 
-data ActivityObject = ActivityObject { activityObjectActor           :: Actor,
+data ActivityObject = ActivityObject { activityObjectActor           :: Maybe Actor,
                                        activityObjectAttachments     :: [Attachment],
                                        activityObjectContent         :: Text,
-                                       activityObjectId              :: ID,
+                                       activityObjectId              :: Maybe ID,
                                        activityObjectType            :: ActivityObjectType,
-                                       activityObjectOriginalContent :: Text,
+                                       activityObjectOriginalContent :: Maybe Text,
                                        activityObjectPlusOners       :: Integer,
                                        activityObjectReplies         :: Integer,
                                        activityObjectResharers       :: Integer,
                                        activityObjectURL             :: URL } deriving (Show, Eq)
 
 instance FromJSON ActivityObject where
-  parseJSON (Object v) = ActivityObject <$> v .:  "actor"
-                                        <*> v .:  "attachments"
+  parseJSON (Object v) = ActivityObject <$> v .:? "actor"
+                                        <*> v .:| ("attachments", [])
                                         <*> v .:  "content"
-                                        <*> v .:  "id"
-                                        <*> v .:  "objectType"
-                                        <*> v .:  "originalContent"
-                                        <*> v `parseTotalItems` "plusOners"
-                                        <*> v `parseTotalItems` "plusReplies"
-                                        <*> v `parseTotalItems` "plusResharers"
+                                        <*> v .:? "id"
+                                        <*> v .:| ("objectType", Note)
+                                        <*> v .:? "originalContent"
+                                        <*> v `parseTotalItems` "plusoners"
+                                        <*> v `parseTotalItems` "replies"
+                                        <*> v `parseTotalItems` "resharers"
                                         <*> v .:  "url"
-    where parseTotalItems v key = maybe (fail "failed to find totalItems") parseJSON $ totalItems' v key
+    where parseTotalItems v key = maybe (fail $ "failed to find " ++ unpack key ++ "/totalItems in " ++ show v) parseJSON $ totalItems' v key
           totalItems' v key = case M.lookup key v of
                                 Just (Object obj) -> M.lookup "totalItems" obj
                                 _                 -> Nothing
@@ -146,24 +164,24 @@ instance FromJSON ActivityObjectType where
   parseJSON (String "activity") = pure GooglePlusActivity
   parseJSON v                   = typeMismatch "ActivityObjectType" v
 
-data Attachment = Attachment { attachmentContent     :: Text,
-                               attachmentDisplayName :: Text,
-                               attachmentEmbed       :: Embed,
-                               attachmentFullImage   :: Image,
-                               attachmentId          :: ID,
-                               attachmentImage       :: Image, -- preview image
+data Attachment = Attachment { attachmentContent     :: Maybe Text,
+                               attachmentDisplayName :: Maybe Text,
+                               attachmentEmbed       :: Maybe Embed,
+                               attachmentFullImage   :: Maybe Image,
+                               attachmentId          :: Maybe ID,
+                               attachmentImage       :: Maybe Image, -- preview image
                                attachmentType        :: AttachmentType,
-                               attachmentURL         :: URL } deriving (Show, Eq)
+                               attachmentURL         :: Maybe URL } deriving (Show, Eq)
 
 instance FromJSON Attachment where
-  parseJSON (Object v) = Attachment <$> v .:  "content"
-                                    <*> v .:  "displayName"
-                                    <*> v .:  "embed"
-                                    <*> v .:  "fullImage"
-                                    <*> v .:  "id"
-                                    <*> v .:  "image"
+  parseJSON (Object v) = Attachment <$> v .:? "content"
+                                    <*> v .:? "displayName"
+                                    <*> v .:? "embed"
+                                    <*> v .:? "fullImage"
+                                    <*> v .:? "id"
+                                    <*> v .:? "image"
                                     <*> v .:  "objectType"
-                                    <*> v .:  "url"
+                                    <*> v .:? "url"
   parseJSON v          =  typeMismatch "AttachmentType" v
 
 data Embed = Embed { embedType :: Text,
@@ -175,14 +193,16 @@ instance FromJSON Embed where
   parseJSON v          =  typeMismatch "Embed" v
 
 data AttachmentType = Photo |
+                      PhotoAlbum | -- undocumented
                       Video |
                       Article deriving (Show, Eq)
 
 instance FromJSON AttachmentType where
-  parseJSON (String "photo")   = pure Photo
-  parseJSON (String "video")   = pure Video
-  parseJSON (String "article") = pure Article
-  parseJSON v                  = typeMismatch "AttachmentType" v
+  parseJSON (String "photo")       = pure Photo
+  parseJSON (String "photo-album") = pure PhotoAlbum
+  parseJSON (String "video")       = pure Video
+  parseJSON (String "article")     = pure Article
+  parseJSON v                      = typeMismatch "AttachmentType" v
 
 data Geocode = Geocode { latitude  :: Double,
                          longitude :: Double } deriving (Show, Eq)
@@ -194,20 +214,20 @@ instance FromJSON Geocode where
           lat           = read . unpack $ latT
   parseJSON v            =  typeMismatch "Geocode" v
 
-data Access = Access { accessDescription :: Text,
+data Access = Access { accessDescription :: Maybe Text,
                        accessItems       :: [AccessItem] } deriving (Show, Eq)
 
 instance FromJSON Access where
-  parseJSON (Object v) = Access <$> v .: "description"
-                               <*> v .: "items"
+  parseJSON (Object v) = Access <$> v .:? "description"
+                                <*> v .:  "items"
   parseJSON v          =  typeMismatch "Access" v
 
-data AccessItem = AccessItem { accessItemId   :: ID,
+data AccessItem = AccessItem { accessItemId   :: Maybe ID,
                                accessItemType :: AccessItemType } deriving (Show, Eq)
 
 instance FromJSON AccessItem where
-  parseJSON (Object v) = AccessItem <$> v .: "id"
-                                    <*> v .: "type"
+  parseJSON (Object v) = AccessItem <$> v .:? "id"
+                                    <*> v .:  "type"
   parseJSON v          =  typeMismatch "AccessItem" v
 
 data AccessItemType = PersonAccess |

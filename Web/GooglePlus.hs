@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Web.GooglePlus (getPerson, getActivity, getActivities) where
+module Web.GooglePlus (getPerson, getActivity, getActivityFeed) where
 
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
@@ -31,20 +31,23 @@ getActivity aid = withEnv $ \auth -> do
   where pth = append "/plus/v1/activities/" $ encodeUtf8 aid
 
 --TODO: pagetoken
-getActivities :: PersonID -> Text -> GooglePlusM (Either Text Activity)
-getActivities pid coll = withEnv $ \auth -> do
+getActivityFeed :: PersonID -> ActivityCollection -> GooglePlusM (Either Text ActivityFeed)
+getActivityFeed pid coll = withEnv $ \auth -> do
   resp <- doGet auth pth []
   return $ handleResponse resp
   where pth = append pidP actP
         pidP = personIdPath pid
-        actP = append "/activities/" $ encodeUtf8 coll
+        actP = append "/activities/" $ collectionPath coll
 
 
 ---- Helpers
 
+collectionPath :: ActivityCollection -> ByteString
+collectionPath PublicCollection = "public"
+
 personIdPath :: PersonID -> ByteString
-personIdPath (PersonID i) = append "/plus/v1/activities/" $ encodeUtf8 i
-personIdPath Me           = "/plus/v1/activities/me"
+personIdPath (PersonID i) = append "/plus/v1/people/" $ encodeUtf8 i
+personIdPath Me           = "/plus/v1/people/me"
 
 doGet :: GooglePlusAuth -> Ascii -> Query -> GooglePlusM (Int, LBS.ByteString)
 doGet auth pth q = liftIO $ withManager $ \manager -> do
