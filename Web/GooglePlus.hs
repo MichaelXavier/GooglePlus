@@ -55,13 +55,19 @@ doGet auth pth q = liftIO $ withManager $ \manager -> do
 
 --TODO: handle oauth
 genRequest :: GooglePlusAuth -> Ascii -> Query -> Request m
-genRequest (APIKey key) pth q = def { host = h,
-                                      path = pth,
-                                      port = 443,
-                                      secure = True,
-                                      queryString = q' }
-  where h  = "www.googleapis.com"
-        q' = ("key", Just $ encodeUtf8 key):q
+genRequest auth pth q = def { host = h,
+                              path = pth,
+                              port = 443,
+                              secure = True,
+                              queryString = q' }
+  where h     = "www.googleapis.com"
+        authq = authParam auth
+        q'    = authq:q
+
+
+authParam :: GooglePlusAuth -> QueryItem
+authParam (APIKey key)     = ("key", Just $ encodeUtf8 key)
+authParam (OAuthToken tok) = ("access_token", Just $ encodeUtf8 tok)
 
 handleResponse :: FromJSON a => (Int, LBS.ByteString) -> Either Text a
 handleResponse (200, str) = packLeft $ fjson =<< parsed
