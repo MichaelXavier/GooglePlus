@@ -20,16 +20,16 @@ extra-source-files: README
 homepage:           http://github.com/michaelxavier/GooglePlus
 
 library
- Exposed-modules: Web.Campfire,
-                  Web.Campfire.Types,
-                  Web.Campfire.Monad
+ Exposed-modules: Web.GooglePlus,
+                  Web.GooglePlus.Types,
+                  Web.GooglePlus.Monad
  Ghc-Options:     -Wall
  build-depends:   base            >= 4        && < 5,
                   aeson           >= 0.3.1.1  && < 0.4,
                   bytestring      >= 0.9.1.10 && < 0.10,
                   text            >= 0.11.0.5 && < 0.12,
-                  attoparsec      >= 0.8.5.0  && < 0.9,
-                  http-enumerator >= 0.6.5    && < 0.7,
+                  attoparsec      >= 0.9.1.2  && < 0.10,
+                  http-enumerator >= 0.7.0    && < 0.8,
                   mtl             >= 2.0.1.0  && < 2.1,
                   rfc3339         >= 1.0.4    && < 1.1,
                   time            >= 1.2.0.3  && < 1.5,

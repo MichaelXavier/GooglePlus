@@ -31,14 +31,19 @@ module Web.GooglePlus.Types (Person(..),
 
 import           Data.Aeson.Types (Parser, typeMismatch)
 import           Control.Applicative ((<$>), (<*>), pure)
-import           Data.Aeson
+import           Data.Aeson (Value(..),
+                             Object,
+                             FromJSON,
+                             parseJSON,
+                             (.:),
+                             (.:?))
 import qualified Data.Map as M
 import           Data.Time.Calendar (Day(..))
 import           Data.Time.LocalTime (ZonedTime(..), zonedTimeToUTC)
 import           Data.Time.RFC3339 (readRFC3339)
-import           Data.Text (Text, unpack, append)
+import           Data.Text (Text, unpack)
 import qualified Data.Text as T
-import           Network.URL
+import           Network.URL (URL(..), importURL)
 
 type ID = Text
 
@@ -96,6 +101,7 @@ instance FromJSON Activity where
                                   <*> v .:? "radius"
                                   <*> v .:? "placeId"
                                   <*> v .:? "placeName"
+  parseJSON v          = typeMismatch "Activity" v
 
 instance Eq ZonedTime where
   a == b = zonedTimeToUTC a == zonedTimeToUTC b
@@ -146,14 +152,14 @@ instance FromJSON ActivityObject where
                                         <*> v .:? "id"
                                         <*> v .:| ("objectType", Note)
                                         <*> v .:? "originalContent"
-                                        <*> v `parseTotalItems` "plusoners"
-                                        <*> v `parseTotalItems` "replies"
-                                        <*> v `parseTotalItems` "resharers"
+                                        <*> parseTotalItems "plusoners"
+                                        <*> parseTotalItems "replies"
+                                        <*> parseTotalItems "resharers"
                                         <*> v .:  "url"
-    where parseTotalItems v key = maybe (fail $ "failed to find " ++ unpack key ++ "/totalItems in " ++ show v) parseJSON $ totalItems' v key
-          totalItems' v key = case M.lookup key v of
-                                Just (Object obj) -> M.lookup "totalItems" obj
-                                _                 -> Nothing
+    where parseTotalItems key = maybe (fail $ "failed to find " ++ unpack key ++ "/totalItems in " ++ show v) parseJSON $ totalItems' key
+          totalItems' key     = case M.lookup key v of
+                                  Just (Object obj) -> M.lookup "totalItems" obj
+                                  _                 -> Nothing
   parseJSON v          =  typeMismatch "ActivityObject" v
 
 data ActivityObjectType = Note |
@@ -451,5 +457,5 @@ obj .:| (key, d) = case M.lookup key obj of
                         Just v  -> parseJSON v
 
 spanSkip :: Char -> Text -> (Text, Text)
-spanSkip pred xs = (left, T.tail right)
-  where (left, right) = T.span (/= pred) xs
+spanSkip cond xs = (left, T.tail right)
+  where (left, right) = T.span (/= cond) xs

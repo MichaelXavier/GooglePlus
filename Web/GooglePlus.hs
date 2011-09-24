@@ -37,7 +37,7 @@ getActivityFeed pid coll = genericGet pth []
 
 genericGet :: FromJSON a => Ascii -> Query -> GooglePlusM (Either Text a)
 genericGet pth qs = withEnv $ \auth -> do
-  resp <- doGet auth pth []
+  resp <- doGet auth pth qs
   return $ handleResponse resp
 
 collectionPath :: ActivityCollection -> ByteString
@@ -73,7 +73,7 @@ handleResponse :: FromJSON a => (Int, LBS.ByteString) -> Either Text a
 handleResponse (200, str) = packLeft $ fjson =<< parsed
   where fjson v = case fromJSON v of
                     Success a -> Right a
-                    Error str -> Left str
+                    Error e   -> Left e
         parsed  = eitherResult $ parse json str
 handleResponse (_, str) = Left $ decodeUtf8 . BS.concat . LBS.toChunks $ str
 
