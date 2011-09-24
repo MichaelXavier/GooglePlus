@@ -3,6 +3,9 @@ GHC_PKG = ghc-pkg
 
 all: build
 
+doc: configure
+	$(CABAL) haddock
+
 install: install_deps
 	$(CABAL) install
 
