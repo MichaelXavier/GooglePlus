@@ -3,3 +3,38 @@ Web.GooglePlus
 
 Haskell implementation of the GooglePlus api. For more info, see
 http://developers.google.com/+/api/
+
+Installation
+------------
+Requires that you have cabal installed. I've included a Makefile for convenience. To install run `make install`
+
+Alternatively, you can install this from Hackage:
+`cabal install googleplus`
+
+Documentation
+-------------
+`make doc` will generate a doc directory. Point your browser at the index.html to see the Haddock documentation.
+
+
+Brief Example
+-------------
+This example is included in the documentation of the Web.GooglePlus:
+
+    {-# LANGUAGE OverloadedStrings #-}
+    import Web.GooglePlus
+    import Web.Campfire.Monad
+    import Web.Campfire.Types
+    import Control.Monad.Reader
+    import Data.Text (unpack)
+
+    doStuff :: GooglePlusM ()
+    doStuff = do
+      Right person <- getPerson Me
+      Right feed   <- getActivityFeed Me PublicCollection
+      -- ...
+      return ()
+
+    main :: IO ()
+    main = do
+      runReaderT (unGooglePlusM doStuff) env
+      where env  = GooglePlusEnv { gpAuth = APIKey "MYKEY" }
