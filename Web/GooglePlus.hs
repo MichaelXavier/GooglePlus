@@ -15,8 +15,8 @@
 -- 
 -- > {-# LANGUAGE OverloadedStrings #-}
 -- > import Web.GooglePlus
--- > import Web.Campfire.Monad
--- > import Web.Campfire.Types
+-- > import Web.GooglePlus.Monad
+-- > import Web.GooglePlus.Types
 -- > import Control.Monad.Reader
 -- > import Data.Text (unpack)
 -- > 
