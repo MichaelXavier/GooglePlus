@@ -23,7 +23,7 @@
 -- > doStuff :: GooglePlusM ()
 -- > doStuff = do
 -- >   Right person <- getPerson Me
--- >   Right feed   <- getActivityFeed Me PublicCollection
+-- >   Right feed   <- getLatestActivityFeed Me PublicCollection
 -- >   -- ...
 -- >   return ()
 -- > 
@@ -34,22 +34,45 @@
 -- 
 --------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-module Web.GooglePlus (getPerson, getActivity, getActivityFeed) where
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+module Web.GooglePlus (getPerson,
+                       getActivity,
+                       getLatestActivityFeed,
+                       enumActivityFeed) where
 
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
 
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Failure (Failure)
+import           Control.Monad.IO.Class (liftIO, MonadIO)
 import           Control.Monad.Reader (asks)
-import           Data.Aeson (json, FromJSON, fromJSON, Result(..))
+import           Data.Aeson (json,
+                             FromJSON,
+                             fromJSON,
+                             Result(..),
+                             Object(..),
+                             Value(Object))
 import           Data.Attoparsec.Lazy (parse, eitherResult)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.ByteString (append)
+import           Data.Maybe (fromJust)
 import           Data.Text (Text, pack)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Enumerator (Enumerator,
+                                  Enumeratee,
+                                  Iteratee,
+                                  tryIO,
+                                  continue,
+                                  yield,
+                                  Stream(Chunks, EOF),
+                                  joinI,
+                                  (=$),
+                                  ($=),
+                                  ($$))
+import qualified Data.Enumerator.List as EL
 import           Network.HTTP.Enumerator
 import           Network.HTTP.Types (Ascii, Query, QueryItem)
 
@@ -67,15 +90,61 @@ getActivity aid = genericGet pth []
 --TODO: pagetoken, pagination, limits, enumerator?
 
 -- | Get an activity who matches the given activity ID and collection to use.
--- Currently uses the default page size (20) and only fetches the first page. I
--- plan to add pagination fairly soon and possibly an enumerator a bit later
-getActivityFeed :: PersonID -> ActivityCollection -> GooglePlusM (Either Text ActivityFeed)
-getActivityFeed pid coll = genericGet pth []
+-- Currently uses the default page size (20) and only fetches the first page.
+-- You will receive an error from the server if the page size exceeds 100.
+getLatestActivityFeed :: PersonID -> ActivityCollection -> Maybe Integer -> GooglePlusM (Either Text ActivityFeed)
+getLatestActivityFeed pid coll perPage = do
+  feed <- getActivityFeedPage pid coll (perPage' perPage) Nothing
+  return $ fst `fmap` feed
+
+enumActivityFeed :: PersonID -> ActivityCollection -> Maybe Integer -> Enumerator ActivityFeed GooglePlusM b
+enumActivityFeed pid coll perPage = EL.unfoldM depaginate FirstPage
+  where depaginate = depaginateActivityFeed pid coll $ perPage' perPage
+
+perPage' :: Maybe Integer -> Integer
+perPage' = maybe defaultPageSize id
+
+-- TODO: simplified, more semantic version, enumActivities
+
+defaultPageSize :: Integer
+defaultPageSize = 20
+
+type PageToken             = Text
+type PaginatedActivityFeed = (ActivityFeed, Maybe PageToken)
+data DepaginationState     = FirstPage |
+                             MorePages PageToken |
+                             NoMorePages
+
+depaginateActivityFeed :: PersonID -> ActivityCollection -> Integer -> DepaginationState -> GooglePlusM (Maybe (ActivityFeed, DepaginationState))
+depaginateActivityFeed pid coll perPage FirstPage       = do
+ page <- getFirstFeedPage pid coll perPage
+ return $ paginatedFeedState `fmap` page
+depaginateActivityFeed pid coll perPage (MorePages tok) = do
+ page <- getActivityFeedPage pid coll perPage $ Just tok
+ return $ paginatedFeedState `fmap` eitherMaybe page
+depaginateActivityFeed _ _ _ NoMorePages                = return Nothing
+
+paginatedFeedState :: PaginatedActivityFeed -> (ActivityFeed, DepaginationState)
+paginatedFeedState (feed, token) = (feed, maybe NoMorePages MorePages token)
+
+getFirstFeedPage :: PersonID -> ActivityCollection -> Integer -> GooglePlusM (Maybe PaginatedActivityFeed)
+getFirstFeedPage pid coll perPage = do
+  page <- getActivityFeedPage pid coll perPage Nothing
+  return $ eitherMaybe page
+
+getActivityFeedPage :: PersonID -> ActivityCollection -> Integer -> Maybe PageToken -> GooglePlusM (Either Text PaginatedActivityFeed)
+getActivityFeedPage pid coll perPage tok = genericGet pth params
   where pth  = append pidP actP
         pidP = personIdPath pid
         actP = append "/activities/" $ collectionPath coll
+        pageParam = BS8.pack . show $ perPage
+        params = case tok of
+                  Nothing -> [("maxResults", Just pageParam)]
+                  Just t  -> [("maxResults", Just pageParam), ("pageToken", Just $ encodeUtf8 t)]
 
----- Helpers
+eitherMaybe :: Either a b -> Maybe b
+eitherMaybe (Left _)  = Nothing
+eitherMaybe (Right x) = Just x
 
 genericGet :: FromJSON a => Ascii -> Query -> GooglePlusM (Either Text a)
 genericGet pth qs = withEnv $ \auth -> do
@@ -124,3 +193,6 @@ packLeft (Left str) = Left $ pack str
 
 withEnv :: (GooglePlusAuth -> GooglePlusM a) -> GooglePlusM a
 withEnv fn = fn =<< asks gpAuth 
+
+--TODO: not needed?
+left =. right = \step_i -> joinI $ left $$ right step_i
