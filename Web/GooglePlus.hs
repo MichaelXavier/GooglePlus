@@ -68,27 +68,36 @@ import           Network.HTTP.Enumerator
 import           Network.HTTP.Types (Ascii, Query, QueryItem)
 
 -- | Get a person who matches the given identifier
-getPerson :: PersonID -> GooglePlusM (Either Text Person)
+getPerson :: PersonID -- ^ Identifier for the person to fetch
+             -> GooglePlusM (Either Text Person)
 getPerson pid = genericGet pth []
   where pth = personIdPath pid
 
 
 -- | Get an activity who matches the given activity ID
-getActivity :: ID -> GooglePlusM (Either Text Activity)
+getActivity :: ID -- ^ Specific ID to fetch
+               -> GooglePlusM (Either Text Activity)
 getActivity aid = genericGet pth []
   where pth = append "/plus/v1/activities/" $ encodeUtf8 aid
 
---TODO: pagetoken, pagination, limits, enumerator?
-
 -- | Get an activity who matches the given activity ID and collection to use.
--- Currently uses the default page size (20) and only fetches the first page.
+-- Default page size is (20) and only fetches the first page.
 -- You will receive an error from the server if the page size exceeds 100.
-getLatestActivityFeed :: PersonID -> ActivityCollection -> Maybe Integer -> GooglePlusM (Either Text ActivityFeed)
+getLatestActivityFeed :: PersonID              -- ^ Feed owner ID
+                         -> ActivityCollection -- ^ Indicates what type of feed to retrieve
+                         -> Maybe Integer      -- ^ Page size. Should be between 1 and 100. Default 20.
+                         -> GooglePlusM (Either Text ActivityFeed)
 getLatestActivityFeed pid coll perPage = do
   feed <- getActivityFeedPage pid coll (perPage' perPage) Nothing
   return $ fst `fmap` feed
 
-enumActivityFeed :: PersonID -> ActivityCollection -> Maybe Integer -> Enumerator ActivityFeed GooglePlusM b
+-- | Paginating enumerator to consume a user's activity stream. Each chunk will
+-- end up being an array with a single ActivityFeed in it with 1 page of data
+-- in it. This weirdness about the chunks only containing 1 element is mostly to prevent 
+enumActivityFeed :: PersonID -- ^ Feed owner ID
+                    -> ActivityCollection -- ^ Indicates what type of feed to retrieve
+                    -> Maybe Integer -- ^ Page size. Should be between 1 and 100. Defualt 20
+                    -> Enumerator ActivityFeed GooglePlusM b
 enumActivityFeed pid coll perPage = EL.unfoldM depaginate FirstPage
   where depaginate = depaginateActivityFeed pid coll $ perPage' perPage
 
