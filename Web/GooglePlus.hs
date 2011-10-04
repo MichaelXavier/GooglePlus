@@ -53,15 +53,15 @@ import           Data.Aeson (json,
                              Object(..),
                              Value(Object))
 import           Data.Attoparsec.Lazy (parse, eitherResult)
-import           Data.ByteString (ByteString)
+import           Data.ByteString (ByteString, append)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
-import           Data.ByteString (append)
 import           Data.Enumerator (Enumerator,
                                   joinI,
                                   ($$))
 import qualified Data.Enumerator.List as EL
+import           Data.Maybe (fromMaybe)
 import           Data.Text (Text, pack)
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Network.HTTP.Enumerator
@@ -92,10 +92,12 @@ enumActivityFeed :: PersonID -> ActivityCollection -> Maybe Integer -> Enumerato
 enumActivityFeed pid coll perPage = EL.unfoldM depaginate FirstPage
   where depaginate = depaginateActivityFeed pid coll $ perPage' perPage
 
-perPage' :: Maybe Integer -> Integer
-perPage' = maybe defaultPageSize id
-
 -- TODO: simplified, more semantic version, enumActivities
+
+---- Helpers
+
+perPage' :: Maybe Integer -> Integer
+perPage' = fromMaybe defaultPageSize
 
 defaultPageSize :: Integer
 defaultPageSize = 20
