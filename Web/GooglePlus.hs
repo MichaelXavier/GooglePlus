@@ -34,7 +34,7 @@
 -- 
 --------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeSynonymInstances #-}
 module Web.GooglePlus (getPerson,
                        getActivity,
                        getLatestActivityFeed,
@@ -44,14 +44,18 @@ module Web.GooglePlus (getPerson,
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
 
+import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Class (lift)
 import           Data.Aeson (json,
                              FromJSON,
                              fromJSON,
+                             parseJSON,
                              Result(..),
+                             (.:?),
                              Value(Object))
+import           Data.Aeson.Types (typeMismatch)
 import           Data.Attoparsec.Lazy (parse, eitherResult)
 import           Data.ByteString (ByteString, append)
 import qualified Data.ByteString as BS
@@ -130,6 +134,12 @@ defaultPageSize = 20
 
 type PageToken             = Text
 type PaginatedActivityFeed = (ActivityFeed, Maybe PageToken)
+
+instance FromJSON PaginatedActivityFeed where
+  parseJSON (Object v) = (,) <$> parseJSON (Object v)
+                             <*> v .:? "nextPageToken"
+  parseJSON v          = typeMismatch "PaginatedActivityFeed" v
+
 data DepaginationState     = FirstPage |
                              MorePages PageToken |
                              NoMorePages

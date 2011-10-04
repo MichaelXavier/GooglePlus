@@ -42,7 +42,6 @@ module Web.GooglePlus.Types (Person(..),
                              Place(..),
                              RelationshipStatus(..)) where
 
-import           Data.Aeson.Types (Parser, typeMismatch)
 import           Control.Applicative ((<$>), (<*>), pure)
 import           Data.Aeson (Value(..),
                              Object,
@@ -50,6 +49,7 @@ import           Data.Aeson (Value(..),
                              parseJSON,
                              (.:),
                              (.:?))
+import           Data.Aeson.Types (Parser, typeMismatch)
 import qualified Data.Map as M
 import           Data.Time.Calendar (Day(..))
 import           Data.Time.LocalTime (ZonedTime(..), zonedTimeToUTC)
