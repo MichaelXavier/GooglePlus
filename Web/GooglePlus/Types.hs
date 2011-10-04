@@ -100,7 +100,6 @@ data Activity = Activity { activityPlaceholder     :: Maybe Bool,     -- ^ Meani
                            activityPlaceName       :: Maybe Text
                          } deriving (Show, Eq)
 
---TODO: activities
 instance FromJSON Activity where
   parseJSON (Object v) = Activity <$> v .:? "placeholder"
                                   <*> v .:  "title"

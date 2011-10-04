@@ -43,14 +43,12 @@ module Web.GooglePlus (getPerson,
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
 
-import           Control.Failure (Failure)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader (asks)
 import           Data.Aeson (json,
                              FromJSON,
                              fromJSON,
                              Result(..),
-                             Object(..),
                              Value(Object))
 import           Data.Attoparsec.Lazy (parse, eitherResult)
 import           Data.ByteString (ByteString, append)
@@ -93,7 +91,12 @@ getLatestActivityFeed pid coll perPage = do
 
 -- | Paginating enumerator to consume a user's activity stream. Each chunk will
 -- end up being an array with a single ActivityFeed in it with 1 page of data
--- in it. This weirdness about the chunks only containing 1 element is mostly to prevent 
+-- in it. This weirdness about the chunks only containing 1 element is mostly
+-- to maintain the metadata available on ActivityFeed and have it available in
+-- each chunk. For a more natural chunking of just Activities if you don't need
+-- that additional metadata, see enumActivities. Note that this Enumerator will
+-- abort if it encounters an error from the server, thus cutting the list
+-- short.
 enumActivityFeed :: PersonID -- ^ Feed owner ID
                     -> ActivityCollection -- ^ Indicates what type of feed to retrieve
                     -> Maybe Integer -- ^ Page size. Should be between 1 and 100. Defualt 20
@@ -167,15 +170,14 @@ doGet auth pth q = liftIO $ withManager $ \manager -> do
   where req = genRequest auth pth q
 
 genRequest :: GooglePlusAuth -> Ascii -> Query -> Request m
-genRequest auth pth q = def { host = h,
-                              path = pth,
-                              port = 443,
-                              secure = True,
+genRequest auth pth q = def { host        = h,
+                              path        = pth,
+                              port        = 443,
+                              secure      = True,
                               queryString = q' }
   where h     = "www.googleapis.com"
         authq = authParam auth
         q'    = authq:q
-
 
 authParam :: GooglePlusAuth -> QueryItem
 authParam (APIKey key)     = ("key", Just $ encodeUtf8 key)
@@ -195,6 +197,3 @@ packLeft (Left str) = Left $ pack str
 
 withEnv :: (GooglePlusAuth -> GooglePlusM a) -> GooglePlusM a
 withEnv fn = fn =<< asks gpAuth 
-
---TODO: not needed?
-left =. right = \step_i -> joinI $ left $$ right step_i

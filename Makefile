@@ -18,7 +18,7 @@ build: configure install_deps
 install_deps: googleplus.cabal
 	$(CABAL) install --only-dependencies
 
-configure: googleplus.cabal *.hs **/*.hs
+configure: googleplus.cabal **/*.hs
 	$(CABAL) configure
 
 clean:
