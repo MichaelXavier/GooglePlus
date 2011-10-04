@@ -38,13 +38,15 @@
 module Web.GooglePlus (getPerson,
                        getActivity,
                        getLatestActivityFeed,
-                       enumActivityFeed) where
+                       enumActivityFeed,
+                       enumActivities) where
 
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
 
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader (asks)
+import           Control.Monad.Trans.Class (lift)
 import           Data.Aeson (json,
                              FromJSON,
                              fromJSON,
@@ -57,6 +59,11 @@ import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Enumerator (Enumerator,
                                   joinI,
+                                  checkContinue1,
+                                  continue,
+                                  Stream (Chunks),
+                                  (>>==),
+                                  ($=),
                                   ($$))
 import qualified Data.Enumerator.List as EL
 import           Data.Maybe (fromMaybe)
@@ -97,14 +104,21 @@ getLatestActivityFeed pid coll perPage = do
 -- that additional metadata, see enumActivities. Note that this Enumerator will
 -- abort if it encounters an error from the server, thus cutting the list
 -- short.
-enumActivityFeed :: PersonID -- ^ Feed owner ID
+enumActivityFeed :: PersonID              -- ^ Feed owner ID
                     -> ActivityCollection -- ^ Indicates what type of feed to retrieve
-                    -> Maybe Integer -- ^ Page size. Should be between 1 and 100. Defualt 20
+                    -> Maybe Integer      -- ^ Page size. Should be between 1 and 100. Defualt 20
                     -> Enumerator ActivityFeed GooglePlusM b
 enumActivityFeed pid coll perPage = EL.unfoldM depaginate FirstPage
   where depaginate = depaginateActivityFeed pid coll $ perPage' perPage
 
--- TODO: simplified, more semantic version, enumActivities
+-- | Paginating enumerator yielding a Chunk for each page. Use this if you
+-- don't need the feed metadata that enumActivityFeed provides.
+enumActivities :: PersonID              -- ^ Feed owner ID
+                  -> ActivityCollection -- ^ Indicates what type of feed to retrieve
+                  -> Maybe Integer      -- ^ Page size. Should be between 1 and 100. Defualt 20
+                  -> Enumerator Activity GooglePlusM b
+enumActivities pid coll perPage = unfoldListM depaginate FirstPage
+  where depaginate = depaginateActivities pid coll (perPage' perPage)
 
 ---- Helpers
 
@@ -119,6 +133,19 @@ type PaginatedActivityFeed = (ActivityFeed, Maybe PageToken)
 data DepaginationState     = FirstPage |
                              MorePages PageToken |
                              NoMorePages
+
+-- Exactly the same as unfoldM but takes the result of the stateful function
+-- and uses it as the chunks, rather than a Chunks with a singleton list
+unfoldListM :: Monad m => (s -> m (Maybe ([a], s))) -> s -> Enumerator a m b
+unfoldListM f = checkContinue1 $ \loop s k -> do
+	fs <- lift (f s)
+	case fs of
+		Nothing -> continue k
+		Just (as, s') -> k (Chunks as) >>== loop s'
+
+depaginateActivities:: PersonID -> ActivityCollection -> Integer -> DepaginationState -> GooglePlusM (Maybe ([Activity], DepaginationState))
+depaginateActivities pid coll perPage state = (return . (fmap unwrap)) =<< depaginateActivityFeed pid coll perPage state
+  where unwrap (feed, s) = (activityFeedItems feed, s)
 
 depaginateActivityFeed :: PersonID -> ActivityCollection -> Integer -> DepaginationState -> GooglePlusM (Maybe (ActivityFeed, DepaginationState))
 depaginateActivityFeed pid coll perPage FirstPage       = do
