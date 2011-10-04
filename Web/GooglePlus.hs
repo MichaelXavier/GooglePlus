@@ -44,7 +44,7 @@ import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
 
 import           Control.Failure (Failure)
-import           Control.Monad.IO.Class (liftIO, MonadIO)
+import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader (asks)
 import           Data.Aeson (json,
                              FromJSON,
@@ -58,21 +58,12 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.ByteString (append)
-import           Data.Maybe (fromJust)
-import           Data.Text (Text, pack)
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Enumerator (Enumerator,
-                                  Enumeratee,
-                                  Iteratee,
-                                  tryIO,
-                                  continue,
-                                  yield,
-                                  Stream(Chunks, EOF),
                                   joinI,
-                                  (=$),
-                                  ($=),
                                   ($$))
 import qualified Data.Enumerator.List as EL
+import           Data.Text (Text, pack)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Network.HTTP.Enumerator
 import           Network.HTTP.Types (Ascii, Query, QueryItem)
 
