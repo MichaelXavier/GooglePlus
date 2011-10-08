@@ -14,13 +14,17 @@
 {-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
 module Web.GooglePlus.Monad where
 
-import Data.Text (Text)
+import Data.Text (Text,unpack)
 import Control.Monad.Reader
 
 -- |Represents authentication data with GooglePlus. Currently supports an OAuth
 --  token or an API key
 data GooglePlusAuth = APIKey Text | -- ^ Authentication using an API key
                       OAuthToken Text -- ^ Authenticate using a token obtianed via OAuth V2. Currently no way in the library to obtain refresh tokens
+
+instance Show GooglePlusAuth where
+  show (APIKey a) = show $ unpack a
+  show (OAuthToken a) = show $ unpack a
 
 --TODO: getting tokens and using refresh tokens
 
