@@ -62,13 +62,10 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Enumerator (Enumerator,
-                                  joinI,
                                   checkContinue1,
                                   continue,
                                   Stream (Chunks),
-                                  (>>==),
-                                  ($=),
-                                  ($$))
+                                  (>>==))
 import qualified Data.Enumerator.List as EL
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text, pack)
@@ -154,7 +151,7 @@ unfoldListM f = checkContinue1 $ \loop s k -> do
 		Just (as, s') -> k (Chunks as) >>== loop s'
 
 depaginateActivities:: PersonID -> ActivityCollection -> Integer -> DepaginationState -> GooglePlusM (Maybe ([Activity], DepaginationState))
-depaginateActivities pid coll perPage state = (return . (fmap unwrap)) =<< depaginateActivityFeed pid coll perPage state
+depaginateActivities pid coll perPage state = (return . fmap unwrap) =<< depaginateActivityFeed pid coll perPage state
   where unwrap (feed, s) = (activityFeedItems feed, s)
 
 depaginateActivityFeed :: PersonID -> ActivityCollection -> Integer -> DepaginationState -> GooglePlusM (Maybe (ActivityFeed, DepaginationState))
