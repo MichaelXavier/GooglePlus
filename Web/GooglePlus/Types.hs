@@ -417,14 +417,14 @@ instance FromJSON EmailType where
   parseJSON v                = typeMismatch "EmailType" v
 
 -- |External URLS that the Person has published
-data PersonURL = PersonURL { personUrlPrimary :: Bool,          -- ^ Whether or not the URL is the Person's primary URl
-                             personUrlType    :: PersonURLType, -- ^ Type of URL
-                             personURLValue   :: URL            -- ^ Actual text URl for the Person
+data PersonURL = PersonURL { personUrlPrimary :: Bool,                -- ^ Whether or not the URL is the Person's primary URl
+                             personUrlType    :: Maybe PersonURLType, -- ^ Type of URL
+                             personURLValue   :: URL                  -- ^ Actual text URl for the Person
                              } deriving (Show, Eq)
 
 instance FromJSON PersonURL where
   parseJSON (Object v) = PersonURL <$> v .:| ("primary", False)
-                                   <*> v .:  "type"
+                                   <*> v .:? "type"
                                    <*> v .:  "value"
   parseJSON v          = typeMismatch "PersonURL" v
 
