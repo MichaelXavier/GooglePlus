@@ -38,3 +38,15 @@ This example is included in the documentation of the Web.GooglePlus:
     main = do
       runReaderT (unGooglePlusM doStuff) env
       where env  = GooglePlusEnv { gpAuth = APIKey "MYKEY" }
+
+Bugs
+----
+Use the issue tracker on github for bugs. I'll do my best to get them resolved
+as soon as I can. One thing you may encounter is a parse error (resulting in a
+Left value) in some of the API calls talking about a key missing. I've tried to
+weed these out as much as possible but this is a result of Google not
+explicitly specifying what fields will always be present. I've had to just feed
+live data through the code to figure out what fields aren't always there. This,
+consequently, is why there are so many Maybe fields in the datatypes. If you
+spot one of these parse errors, please tell me right away so I can correct the
+types.

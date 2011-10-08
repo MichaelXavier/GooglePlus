@@ -1,5 +1,5 @@
 name: googleplus
-version: 0.2.1
+version: 0.2.2
 synopsis: Haskell implementation of the Google+ API
 description:
    Will implement the Google+ REST API. Google+ is a social network made by
