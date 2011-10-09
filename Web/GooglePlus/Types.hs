@@ -13,6 +13,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 module Web.GooglePlus.Types (Person(..),
+                             PersonSearchResult(..),
                              PersonID(..),
                              ActivityCollection(..),
                              ID,
@@ -338,6 +339,20 @@ instance FromJSON Person where
                                 <*> v .:| ("languagesSpoken", [])
                                 <*> v .:? "hasApp"
   parseJSON v          = typeMismatch "Person" v
+
+-- |A Person search result with limited informaiton. The full person's profile must be retrieved to get the rest
+data PersonSearchResult = PersonSearchResult { personSRId          :: ID,    -- ^ Id of the Person
+                                               personSRDisplayName :: Text,  -- ^ Name of the Person, suitable for display
+                                               personSRImage       :: Image, -- ^ Profile image for the Person
+                                               personSRProfileURL  :: URL    -- ^ URL to the person's profile
+                                             } deriving (Show, Eq)
+
+instance FromJSON PersonSearchResult where
+  parseJSON (Object v) = PersonSearchResult <$> v .:  "id"
+                                            <*> v .:  "displayName"
+                                            <*> v .:  "image"
+                                            <*> v .:  "url"
+  parseJSON v          = typeMismatch "PersonSearchResult" v
 
 instance FromJSON Day where
   parseJSON (String str) = pure . read . unpack $ str
