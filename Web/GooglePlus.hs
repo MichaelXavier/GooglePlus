@@ -39,9 +39,10 @@ module Web.GooglePlus (getPerson,
                        getActivity,
                        getLatestActivityFeed,
                        enumActivityFeed,
+                       getActivityFeed,
                        enumActivities,
                        enumPersonSearch,
-                       personSearch) where
+                       getPersonSearch) where
 
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
@@ -119,6 +120,19 @@ enumActivityFeed :: PersonID              -- ^ Feed owner ID
 enumActivityFeed pid coll perPage = EL.unfoldM depaginate FirstPage
   where depaginate = depaginateActivityFeed pid coll $ perPageActivity perPage
 
+-- | Simplified version of enumActivityFeed which retrieves all pages of an
+-- activity feed and merges them into one. Note that this will not be as
+-- efficient as enumActivityFeed in terms of memory/time because it collects
+-- them all in memory first.
+getActivityFeed :: PersonID
+                   -> ActivityCollection
+                   -> Maybe Integer
+                   -> GooglePlusM ActivityFeed
+getActivityFeed pid coll perPage = do
+  feeds <- run_ $ enumActivityFeed pid coll perPage $$ EL.consume
+  return $ foldl1 mergeFeeds feeds
+  where mergeFeeds a ActivityFeed { activityFeedItems = is} = a { activityFeedItems = (activityFeedItems a) ++ is }
+
 -- | Paginating enumerator yielding a Chunk for each page. Use this if you
 -- don't need the feed metadata that enumActivityFeed provides.
 enumActivities :: PersonID              -- ^ Feed owner ID
@@ -141,9 +155,9 @@ enumPersonSearch search perPage = unfoldListM depaginate FirstPage
 -- | Returns the full result set for a person search given a search string.
 -- This interface is simpler to use but does not have the flexibility/memory
 -- usage benefit of enumPersonSearch.
-personSearch :: Text -- ^ Search string
+getPersonSearch :: Text -- ^ Search string
                 -> GooglePlusM [PersonSearchResult]
-personSearch search = run_ $ enumPersonSearch search (Just 20) $$ EL.consume
+getPersonSearch search = run_ $ enumPersonSearch search (Just 20) $$ EL.consume
 
 ---- Helpers
 
