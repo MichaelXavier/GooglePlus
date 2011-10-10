@@ -41,6 +41,7 @@ module Web.GooglePlus (getPerson,
                        enumActivityFeed,
                        getActivityFeed,
                        enumActivities,
+                       getActivities,
                        enumPersonSearch,
                        getPersonSearch) where
 
@@ -123,13 +124,13 @@ enumActivityFeed pid coll perPage = EL.unfoldM depaginate FirstPage
 -- | Simplified version of enumActivityFeed which retrieves all pages of an
 -- activity feed and merges them into one. Note that this will not be as
 -- efficient as enumActivityFeed in terms of memory/time because it collects
--- them all in memory first.
+-- them all in memory first. Note that this should incur 1 API call per page of
+-- results, so the max page size of 100 is used.
 getActivityFeed :: PersonID
                    -> ActivityCollection
-                   -> Maybe Integer
                    -> GooglePlusM ActivityFeed
-getActivityFeed pid coll perPage = do
-  feeds <- run_ $ enumActivityFeed pid coll perPage $$ EL.consume
+getActivityFeed pid coll = do
+  feeds <- run_ $ enumActivityFeed pid coll (Just 100) $$ EL.consume
   return $ foldl1 mergeFeeds feeds
   where mergeFeeds a ActivityFeed { activityFeedItems = is} = a { activityFeedItems = (activityFeedItems a) ++ is }
 
@@ -141,6 +142,14 @@ enumActivities :: PersonID              -- ^ Feed owner ID
                   -> Enumerator Activity GooglePlusM b
 enumActivities pid coll perPage = unfoldListM depaginate FirstPage
   where depaginate = depaginateActivities pid coll $ perPageActivity perPage
+
+-- | Simplified version of enumActivities that fetches all the activitys of a
+-- Person first, thus returning them. Note that this should incur 1 API call
+-- per page of results, so the max page size of 100 is used.
+getActivities :: PersonID              -- ^ Feed owner ID
+                 -> ActivityCollection -- ^ Indicates what type of feed to retrieve
+                 -> GooglePlusM [Activity]
+getActivities pid coll = run_ $ enumActivities pid coll (Just 100) $$ EL.consume
 
 
 -- | Paginating enumerator yielding a Chunk for each page. Note that this
