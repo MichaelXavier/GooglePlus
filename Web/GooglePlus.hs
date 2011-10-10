@@ -54,6 +54,7 @@ import           Data.Aeson (json,
                              fromJSON,
                              parseJSON,
                              Result(..),
+                             (.:),
                              (.:?),
                              Value(Object))
 import           Data.Aeson.Types (typeMismatch)
@@ -202,7 +203,7 @@ depaginatePersonSearch search perPage state = depaginatePersonSearchResult searc
 type PaginatedPersonSearch = ([PersonSearchResult], Maybe PageToken)
 
 instance FromJSON PaginatedPersonSearch where
-  parseJSON (Object v) = (,) <$> parseJSON (Object v)
+  parseJSON (Object v) = (,) <$> v .: "items"
                              <*> v .:? "nextPageToken"
   parseJSON v          = typeMismatch "PaginatedPersonSearch" v
 
@@ -231,8 +232,11 @@ getPersonSearchPage search perPage tok = genericGet pth params
   where pth  = "/plus/v1/people"
         pageParam = BS8.pack . show $ perPage
         params = case tok of
-                  Nothing -> [("maxResults", Just pageParam)]
-                  Just t  -> [("maxResults", Just pageParam), ("pageToken", Just $ encodeUtf8 t)]
+                  Nothing -> [("maxResults", Just pageParam),
+                              ("query", Just $ encodeUtf8 search)]
+                  Just t  -> [("maxResults", Just pageParam),
+                              ("query", Just $ encodeUtf8 search),
+                              ("pageToken", Just $ encodeUtf8 t)]
 
 -- Internals
 
