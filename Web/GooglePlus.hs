@@ -67,12 +67,10 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Enumerator (Enumerator,
-                                  joinI,
                                   checkContinue1,
                                   continue,
                                   Stream (Chunks),
                                   (>>==),
-                                  ($=),
                                   run_,
                                   ($$))
 import qualified Data.Enumerator.List as EL
