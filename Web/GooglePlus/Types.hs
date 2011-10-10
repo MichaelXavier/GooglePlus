@@ -507,7 +507,7 @@ data Place = Place { placePrimary :: Bool, -- ^ Whether or not this is/was the P
                    } deriving (Show, Eq)
 
 instance FromJSON Place where
-  parseJSON (Object v) = Place <$> v .: "primary"
+  parseJSON (Object v) = Place <$> v .:| ("primary", False)
                                <*> v .: "value"
   parseJSON v          = typeMismatch "Place" v
 
