@@ -40,7 +40,8 @@ module Web.GooglePlus (getPerson,
                        getLatestActivityFeed,
                        enumActivityFeed,
                        enumActivities,
-                       enumPersonSearch) where
+                       enumPersonSearch,
+                       personSearch) where
 
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
@@ -70,6 +71,7 @@ import           Data.Enumerator (Enumerator,
                                   Stream (Chunks),
                                   (>>==),
                                   ($=),
+                                  run_,
                                   ($$))
 import qualified Data.Enumerator.List as EL
 import           Data.Maybe (fromMaybe)
@@ -135,6 +137,13 @@ enumPersonSearch :: Text             -- ^ Search string
                     -> Enumerator PersonSearchResult GooglePlusM b
 enumPersonSearch search perPage = unfoldListM depaginate FirstPage
   where depaginate = depaginatePersonSearch search (perPagePersonSearch perPage)
+
+-- | Returns the full result set for a person search given a search string.
+-- This interface is simpler to use but does not have the flexibility/memory
+-- usage benefit of enumPersonSearch.
+personSearch :: Text -- ^ Search string
+                -> GooglePlusM [PersonSearchResult]
+personSearch search = run_ $ enumPersonSearch search (Just 20) $$ EL.consume
 
 ---- Helpers
 
