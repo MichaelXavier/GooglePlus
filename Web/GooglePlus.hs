@@ -139,7 +139,12 @@ enumActivities :: PersonID              -- ^ Feed owner ID
                   -> Maybe Integer      -- ^ Page size. Should be between 1 and 100. Defualt 20
                   -> Enumerator Activity GooglePlusM b
 enumActivities pid coll perPage = simpleDepaginator depaginate
-  where depaginate = depaginateActivities pid coll $ perPageActivity perPage
+  where depaginate = simpleDepaginationStep perPage' pth params
+        pth        = pidP `append` actP
+        actP       = append "/activities/" $ collectionPath coll
+        pidP       = personIdPath pid
+        params     = []
+        perPage'   = perPageActivity perPage
 
 -- | Simplified version of enumActivities that fetches all the activitys of a
 -- Person first, thus returning them. Note that this should incur 1 API call
@@ -171,13 +176,16 @@ getPersonSearch search = run_ $ enumPersonSearch search (Just 20) $$ EL.consume
 
 ---- Helpers
 
-simpleDepaginator  :: Monad m => (DepaginationState -> m (Maybe ([a], DepaginationState))) -> Enumerator a m b
+simpleDepaginator  :: Monad m => (DepaginationState -> m (Maybe ([a], DepaginationState)))
+                                 -> Enumerator a m b
 simpleDepaginator depaginate = unfoldListM depaginate FirstPage
 
-perPageActivity :: Maybe Integer -> Integer
+perPageActivity :: Maybe Integer
+                   -> Integer
 perPageActivity = fromMaybe 20
 
-perPagePersonSearch :: Maybe Integer -> Integer
+perPagePersonSearch :: Maybe Integer
+                       -> Integer
 perPagePersonSearch = fromMaybe 10
 
 type PageToken             = Text
@@ -194,26 +202,26 @@ data DepaginationState     = FirstPage |
 
 -- Exactly the same as unfoldM but takes the result of the stateful function
 -- and uses it as the chunks, rather than a Chunks with a singleton list
-unfoldListM :: Monad m => (s -> m (Maybe ([a], s))) -> s -> Enumerator a m b
+unfoldListM :: Monad m => (s -> m (Maybe ([a], s)))
+                          -> s
+                          -> Enumerator a m b
 unfoldListM f = checkContinue1 $ \loop s k -> do
 	fs <- lift (f s)
 	case fs of
 		Nothing -> continue k
 		Just (as, s') -> k (Chunks as) >>== loop s'
 
---simpleDepaginateStep :: DepaginationState -> GooglePlusM (Maybe ([a], DepaginationState))
-
 simpleGetFirstPage :: FromJSON a => Integer
                                     -> Ascii
                                     -> Query
-                                    -> GooglePlusM (Maybe ([a], Maybe PageToken))
+                                    -> GooglePlusM (Maybe (PaginatedResource a))
 simpleGetFirstPage perPage = simpleGetPage perPage Nothing
 
 simpleGetPage :: FromJSON a => Integer
-                               -> Maybe PageToken 
-                               -> Ascii 
-                               -> Query 
-                               -> GooglePlusM (Maybe ([a], Maybe PageToken))
+                            -> Maybe PageToken 
+                            -> Ascii 
+                            -> Query 
+                            -> GooglePlusM (Maybe (PaginatedResource a))
 simpleGetPage perPage tok pth params = do
   page <- genericGet pth $ params ++ pageParams
   return $ eitherMaybe page
@@ -233,11 +241,19 @@ simpleDepaginationStep _ _ _ NoMorePages = return Nothing
 
 -- Activities Specifics
 
-depaginateActivities :: PersonID -> ActivityCollection -> Integer -> DepaginationState -> GooglePlusM (Maybe ([Activity], DepaginationState))
+depaginateActivities :: PersonID
+                        -> ActivityCollection
+                        -> Integer
+                        -> DepaginationState
+                        -> GooglePlusM (Maybe ([Activity], DepaginationState))
 depaginateActivities pid coll perPage state = (return . fmap unwrap) =<< depaginateActivityFeed pid coll perPage state
   where unwrap (feed, s) = (activityFeedItems feed, s)
 
-depaginateActivityFeed :: PersonID -> ActivityCollection -> Integer -> DepaginationState -> GooglePlusM (Maybe (ActivityFeed, DepaginationState))
+depaginateActivityFeed :: PersonID
+                          -> ActivityCollection
+                          -> Integer
+                          -> DepaginationState
+                          -> GooglePlusM (Maybe (ActivityFeed, DepaginationState))
 depaginateActivityFeed pid coll perPage FirstPage       = do
  page <- getFirstFeedPage pid coll perPage
  return $ paginatedState `fmap` page
@@ -246,12 +262,19 @@ depaginateActivityFeed pid coll perPage (MorePages tok) = do
  return $ paginatedState `fmap` eitherMaybe page
 depaginateActivityFeed _ _ _ NoMorePages                = return Nothing
 
-getFirstFeedPage :: PersonID -> ActivityCollection -> Integer -> GooglePlusM (Maybe PaginatedActivityFeed)
+getFirstFeedPage :: PersonID
+                    -> ActivityCollection
+                    -> Integer
+                    -> GooglePlusM (Maybe PaginatedActivityFeed)
 getFirstFeedPage pid coll perPage = do
   page <- getActivityFeedPage pid coll perPage Nothing
   return $ eitherMaybe page
 
-getActivityFeedPage :: PersonID -> ActivityCollection -> Integer -> Maybe PageToken -> GooglePlusM (Either Text PaginatedActivityFeed)
+getActivityFeedPage :: PersonID
+                       -> ActivityCollection
+                       -> Integer
+                       -> Maybe PageToken
+                       -> GooglePlusM (Either Text PaginatedActivityFeed)
 getActivityFeedPage pid coll perPage tok = genericGet pth params
   where pth  = append pidP actP
         pidP = personIdPath pid
@@ -261,40 +284,51 @@ getActivityFeedPage pid coll perPage tok = genericGet pth params
                   Nothing -> [("maxResults", Just pageParam)]
                   Just t  -> [("maxResults", Just pageParam), ("pageToken", Just $ encodeUtf8 t)]
 
--- PersonSearch specifics
+type PaginatedResource a = ([a], Maybe PageToken)
 
-type PaginatedPersonSearch = ([PersonSearchResult], Maybe PageToken)
+instance FromJSON a => FromJSON (PaginatedResource a) where
+  parseJSON (Object v) = (,) <$> v .: "items"
+                            <*> v .:? "nextPageToken"
+  parseJSON v          = typeMismatch "PaginatedResource" v
 
---type PaginatedResource a = ([a], Maybe PageToken)
-
-paginatedState :: (a, Maybe PageToken) -> (a, DepaginationState)
+paginatedState :: (a, Maybe PageToken)
+                  -> (a, DepaginationState)
 paginatedState (results, token) = (results, maybe NoMorePages MorePages token)
 
 -- Internals
 
-eitherMaybe :: Either a b -> Maybe b
+eitherMaybe :: Either a b
+               -> Maybe b
 eitherMaybe (Left _)  = Nothing
 eitherMaybe (Right x) = Just x
 
-genericGet :: FromJSON a => Ascii -> Query -> GooglePlusM (Either Text a)
-genericGet pth qs = withEnv $ \auth -> do
-  resp <- doGet auth pth qs
-  return $ handleResponse resp
+genericGet :: FromJSON a => Ascii
+                            -> Query
+                            -> GooglePlusM (Either Text a)
+genericGet pth qs = withEnv $ \auth -> return . handleResponse =<< doGet auth pth qs
 
-collectionPath :: ActivityCollection -> ByteString
+collectionPath :: ActivityCollection
+                  -> ByteString
 collectionPath PublicCollection = "public"
 
-personIdPath :: PersonID -> ByteString
+personIdPath :: PersonID
+                -> ByteString
 personIdPath (PersonID i) = append "/plus/v1/people/" $ encodeUtf8 i
 personIdPath Me           = "/plus/v1/people/me"
 
-doGet :: GooglePlusAuth -> Ascii -> Query -> GooglePlusM (Int, LBS.ByteString)
+doGet :: GooglePlusAuth
+         -> Ascii
+         -> Query
+         -> GooglePlusM (Int, LBS.ByteString)
 doGet auth pth q = liftIO $ withManager $ \manager -> do
   Response { statusCode = c, responseBody = b} <- httpLbsRedirect req manager
   return (c, b)
   where req = genRequest auth pth q
 
-genRequest :: GooglePlusAuth -> Ascii -> Query -> Request m
+genRequest :: GooglePlusAuth
+              -> Ascii
+              -> Query
+              -> Request m
 genRequest auth pth q = def { host        = h,
                               path        = pth,
                               port        = 443,
@@ -304,11 +338,13 @@ genRequest auth pth q = def { host        = h,
         authq = authParam auth
         q'    = authq:q
 
-authParam :: GooglePlusAuth -> QueryItem
+authParam :: GooglePlusAuth
+             -> QueryItem
 authParam (APIKey key)     = ("key", Just $ encodeUtf8 key)
 authParam (OAuthToken tok) = ("access_token", Just $ encodeUtf8 tok)
 
-handleResponse :: FromJSON a => (Int, LBS.ByteString) -> Either Text a
+handleResponse :: FromJSON a => (Int, LBS.ByteString)
+                                -> Either Text a
 handleResponse (200, str) = packLeft $ fjson =<< parsed
   where fjson v = case fromJSON v of
                     Success a -> Right a
@@ -316,9 +352,11 @@ handleResponse (200, str) = packLeft $ fjson =<< parsed
         parsed  = eitherResult $ parse json str
 handleResponse (_, str) = Left $ decodeUtf8 . BS.concat . LBS.toChunks $ str
 
-packLeft :: Either String a -> Either Text a
+packLeft :: Either String a
+            -> Either Text a
 packLeft (Right x)  = Right x
 packLeft (Left str) = Left $ pack str
 
-withEnv :: (GooglePlusAuth -> GooglePlusM a) -> GooglePlusM a
+withEnv :: (GooglePlusAuth -> GooglePlusM a)
+           -> GooglePlusM a
 withEnv fn = fn =<< asks gpAuth 
