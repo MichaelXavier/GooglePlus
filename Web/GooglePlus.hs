@@ -227,13 +227,8 @@ simpleDepaginationStep :: FromJSON a => Integer
                                      -> Query 
                                      -> DepaginationState 
                                      -> GooglePlusM (Maybe ([a], DepaginationState))
- --TODO: get rid of do notation
-simpleDepaginationStep perPage pth params FirstPage = do
-  page <- simpleGetFirstPage perPage pth params
-  return $ paginatedState `fmap` page
-simpleDepaginationStep perPage pth params (MorePages tok) = do
-  page <- simpleGetPage perPage (Just tok) pth params
-  return $ paginatedState `fmap` page
+simpleDepaginationStep perPage pth params FirstPage       = (return . fmap paginatedState) =<< simpleGetFirstPage perPage pth params
+simpleDepaginationStep perPage pth params (MorePages tok) = (return . fmap paginatedState) =<< simpleGetPage perPage (Just tok) pth params
 simpleDepaginationStep _ _ _ NoMorePages = return Nothing
 
 -- Activities Specifics
