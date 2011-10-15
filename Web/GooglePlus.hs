@@ -46,6 +46,8 @@ module Web.GooglePlus (getPerson,
                        getPersonSearch,
                        enumPeopleByActivity,
                        getPeopleByActivity,
+                       enumActivitySearch,
+                       getActivitySearch,
                        ActivityCollection(..),
                        ListByActivityCollection(..)) where
 
@@ -169,7 +171,7 @@ enumPersonSearch search perPage = simpleDepaginator depaginate
   where depaginate = simpleDepaginationStep perPage' pth params
         pth        = "/plus/v1/people"
         params     = [("query", Just $ encodeUtf8 search)]
-        perPage'   = perPagePersonSearch perPage
+        perPage'   = perPageSearch perPage
 
 -- | Returns the full result set for a person search given a search string.
 -- This interface is simpler to use but does not have the flexibility/memory
@@ -203,6 +205,17 @@ getPeopleByActivity :: ID                          -- ^ Activity ID
                        -> GooglePlusM [Person]
 getPeopleByActivity aid coll = run_ $ enumPeopleByActivity aid coll (Just 100) $$ EL.consume
 
+enumActivitySearch :: Text           -- ^ Search string
+                    -> Maybe Integer -- ^ Optional page size. Shold be between 1 and 20. Default 10
+                    -> Enumerator Activity GooglePlusM b
+enumActivitySearch search perPage = simpleDepaginator depaginate
+  where depaginate = simpleDepaginationStep perPage' pth params
+        pth        = "/plus/v1/activities"
+        params     = [("query", Just $ encodeUtf8 search)]
+        perPage'   = perPageSearch perPage
+
+getActivitySearch = undefined
+
 ---- Helpers
 
 simpleDepaginator  :: Monad m => (DepaginationState -> m (Maybe ([a], DepaginationState)))
@@ -213,9 +226,9 @@ perPageActivity :: Maybe Integer
                    -> Integer
 perPageActivity = fromMaybe 20
 
-perPagePersonSearch :: Maybe Integer
-                       -> Integer
-perPagePersonSearch = fromMaybe 10
+perPageSearch :: Maybe Integer
+                 -> Integer
+perPageSearch = fromMaybe 10
 
 type PageToken             = Text
 type PaginatedActivityFeed = (ActivityFeed, Maybe PageToken)
