@@ -43,7 +43,11 @@ module Web.GooglePlus (getPerson,
                        enumActivities,
                        getActivities,
                        enumPersonSearch,
-                       getPersonSearch) where
+                       getPersonSearch,
+                       enumPeopleByActivity,
+                       getPeopleByActivity,
+                       ActivityCollection(..),
+                       ListByActivityCollection(..)) where
 
 import Web.GooglePlus.Types
 import Web.GooglePlus.Monad
@@ -91,7 +95,7 @@ getPerson pid = genericGet pth []
 getActivity :: ID -- ^ Specific ID to fetch
                -> GooglePlusM (Either Text Activity)
 getActivity aid = genericGet pth []
-  where pth = append "/plus/v1/activities/" $ encodeUtf8 aid
+  where pth = "/plus/v1/activities/" `append` encodeUtf8 aid
 
 -- | Get an activity who matches the given activity ID and collection to use.
 -- Default page size is (20) and only fetches the first page.
@@ -141,7 +145,7 @@ enumActivities :: PersonID              -- ^ Feed owner ID
 enumActivities pid coll perPage = simpleDepaginator depaginate
   where depaginate = simpleDepaginationStep perPage' pth params
         pth        = pidP `append` actP
-        actP       = append "/activities/" $ collectionPath coll
+        actP       = "/activities/" `append` collectionPath coll
         pidP       = personIdPath pid
         params     = []
         perPage'   = perPageActivity perPage
@@ -155,9 +159,9 @@ getActivities :: PersonID              -- ^ Feed owner ID
 getActivities pid coll = run_ $ enumActivities pid coll (Just 100) $$ EL.consume
 
 
--- | Paginating enumerator yielding a Chunk for each page. Note that this
--- Enumerator will abort if it encounters an error from the server, thus
--- cutting the list short.
+-- | Search for a member of Google+. Paginating enumerator yielding a Chunk for
+-- each page. Note that this Enumerator will abort if it encounters an error
+-- from the server, thus cutting the list short.
 enumPersonSearch :: Text             -- ^ Search string
                     -> Maybe Integer -- ^ Optional page size. Shold be between 1 and 20. Default 10
                     -> Enumerator PersonSearchResult GooglePlusM b
@@ -173,6 +177,31 @@ enumPersonSearch search perPage = simpleDepaginator depaginate
 getPersonSearch :: Text -- ^ Search string
                 -> GooglePlusM [PersonSearchResult]
 getPersonSearch search = run_ $ enumPersonSearch search (Just 20) $$ EL.consume
+
+-- | Find people associated with a particular Activity. Paginating enumerator
+-- yielding a Chunk for each page. Paginating enumerator yielding a Chunk for
+-- each page. Note that this Enumerator will abort if it encounters an error
+-- from the server, thus cutting the list short.
+enumPeopleByActivity :: ID                          -- ^ Activity ID
+                        -> ListByActivityCollection -- ^ Indicates which collection of people to list
+                        -> Maybe Integer            -- ^ Optional page size. Should be between 1 and 100. Default 20.
+                        -> Enumerator Person GooglePlusM b
+enumPeopleByActivity aid coll perPage = simpleDepaginator depaginate
+  where depaginate      = simpleDepaginationStep perPage' pth params
+        pth             = "/plus/v1/activities/" `append` encodeUtf8 aid `append` peopleP `append` collP coll
+        peopleP         = "/people/"
+        collP PlusOners = "plusoners"
+        collP Resharers = "resharers"
+        params          = []
+        perPage'        = perPageActivity perPage
+
+-- | Returns the full result set for a person search given a search string.
+-- This interface is simpler to use but does not have the flexibility/memory
+-- usage benefit of enumPersonSearch.
+getPeopleByActivity :: ID                          -- ^ Activity ID
+                       -> ListByActivityCollection -- ^ Indicates which collection of people to list
+                       -> GooglePlusM [Person]
+getPeopleByActivity aid coll = run_ $ enumPeopleByActivity aid coll (Just 100) $$ EL.consume
 
 ---- Helpers
 
@@ -276,9 +305,9 @@ getActivityFeedPage :: PersonID
                        -> Maybe PageToken
                        -> GooglePlusM (Either Text PaginatedActivityFeed)
 getActivityFeedPage pid coll perPage tok = genericGet pth params
-  where pth  = append pidP actP
+  where pth  = pidP `append` actP
         pidP = personIdPath pid
-        actP = append "/activities/" $ collectionPath coll
+        actP = "/activities/" `append` collectionPath coll
         pageParam = BS8.pack . show $ perPage
         params = case tok of
                   Nothing -> [("maxResults", Just pageParam)]
@@ -290,6 +319,14 @@ instance FromJSON a => FromJSON (PaginatedResource a) where
   parseJSON (Object v) = (,) <$> v .: "items"
                             <*> v .:? "nextPageToken"
   parseJSON v          = typeMismatch "PaginatedResource" v
+
+-- | Specifies the type of Activities to get in an Activity listing. Currently
+-- the API only allows public.
+data ActivityCollection = PublicCollection deriving (Show, Eq)
+
+data ListByActivityCollection = PlusOners | -- ^ List of people who have +1ed an activity
+                                Resharers   -- ^ List of people who have reshared an activity
+                                deriving (Show, Eq)
 
 paginatedState :: (a, Maybe PageToken)
                   -> (a, DepaginationState)
@@ -313,7 +350,7 @@ collectionPath PublicCollection = "public"
 
 personIdPath :: PersonID
                 -> ByteString
-personIdPath (PersonID i) = append "/plus/v1/people/" $ encodeUtf8 i
+personIdPath (PersonID i) = "/plus/v1/people/" `append` encodeUtf8 i
 personIdPath Me           = "/plus/v1/people/me"
 
 doGet :: GooglePlusAuth

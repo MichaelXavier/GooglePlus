@@ -15,7 +15,6 @@
 module Web.GooglePlus.Types (Person(..),
                              PersonSearchResult(..),
                              PersonID(..),
-                             ActivityCollection(..),
                              ID,
                              Actor(..),
                              Verb(..),
@@ -69,9 +68,6 @@ data ActivityFeed = ActivityFeed { activityFeedTitle   :: Text,      -- ^ Title 
                                    activityFeedId      :: ID,        -- ^ Unique ID of the feed
                                    activityFeedItems   :: [Activity] -- ^ Activities in the feed (currently limited to first page
                                    } deriving (Show, Eq)
-
--- |Specifies the type of Activities to get. Currently the API only allows public.
-data ActivityCollection = PublicCollection deriving (Show, Eq)
 
 instance FromJSON ActivityFeed where
   parseJSON (Object v) = ActivityFeed <$> v .: "title"
