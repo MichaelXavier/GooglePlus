@@ -37,6 +37,7 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeSynonymInstances #-}
 module Web.GooglePlus (getPerson,
                        getActivity,
+                       getComment,
                        getLatestActivityFeed,
                        enumActivityFeed,
                        getActivityFeed,
@@ -48,6 +49,8 @@ module Web.GooglePlus (getPerson,
                        getPeopleByActivity,
                        enumActivitySearch,
                        getActivitySearch,
+                       enumComments,
+                       getComments,
                        SearchOrderBy(..),
                        ActivityCollection(..),
                        ListByActivityCollection(..)) where
@@ -94,11 +97,17 @@ getPerson pid = genericGet pth []
   where pth = personIdPath pid
 
 
--- | Get an activity who matches the given activity ID
+-- | Get an activity which matches the given activity ID
 getActivity :: ID -- ^ Specific ID to fetch
                -> GooglePlusM (Either Text Activity)
 getActivity aid = genericGet pth []
   where pth = "/plus/v1/activities/" `append` encodeUtf8 aid
+
+-- | Get a comment which matches the given comment ID
+getComment :: ID -- ^ Specific ID to fetch
+              -> GooglePlusM (Either Text Comment)
+getComment cid = genericGet pth []
+  where pth = "/plus/v1/comments/" `append` encodeUtf8 cid
 
 -- | Get an activity who matches the given activity ID and collection to use.
 -- Default page size is (20) and only fetches the first page.
@@ -200,12 +209,15 @@ enumPeopleByActivity aid coll perPage = simpleDepaginator depaginate
 
 -- | Returns the full result set for a person search given a search string.
 -- This interface is simpler to use but does not have the flexibility/memory
--- usage benefit of enumPersonSearch.
+-- usage benefit of enumPeopleByActivity.
 getPeopleByActivity :: ID                          -- ^ Activity ID
                        -> ListByActivityCollection -- ^ Indicates which collection of people to list
                        -> GooglePlusM [Person]
 getPeopleByActivity aid coll = run_ $ enumPeopleByActivity aid coll (Just 100) $$ EL.consume
 
+-- | Search for an activity on Google+. Paginating enumerator yielding a Chunk
+-- for each page. Note that this Enumerator will abort if it encounters an error
+-- from the server, thus cutting the list short.
 enumActivitySearch :: Text             -- ^ Search string
                       -> SearchOrderBy -- ^ Order of search results
                       -> Maybe Integer -- ^ Optional page size. Shold be between 1 and 20. Default 10
@@ -219,7 +231,32 @@ enumActivitySearch search orderBy perPage = simpleDepaginator depaginate
         orderParam Recent = "recent"
         perPage'          = perPageSearch perPage
 
-getActivitySearch = undefined
+-- | Returns the full result set for an activity search given a search string.
+-- This interface is simpler to use but does not have the flexibility/memory
+-- usage benefit of enumActivitySearch.
+getActivitySearch :: Text             -- ^ Search string
+                     -> SearchOrderBy -- ^ Order of search results
+                     -> GooglePlusM [Activity]
+getActivitySearch search orderBy = run_ $ enumActivitySearch search orderBy (Just 20) $$ EL.consume
+
+-- | Find comments for an activity on Google+. Paginating enumerator yielding a
+-- Chunk for each page. Note that this Enumerator will abort if it encounters
+-- an error from the server, thus cutting the list short.
+enumComments :: ID               -- ^ Activity ID
+                -> Maybe Integer -- ^ Optional page size. Should be between 1 and 100. Default 20
+                -> Enumerator Comment GooglePlusM b
+enumComments aid perPage = simpleDepaginator depaginate
+  where depaginate = simpleDepaginationStep perPage' pth params
+        pth        = "/plus/v1/activities/" `append` encodeUtf8 aid `append` "/comments"
+        params     = []
+        perPage'   = perPageActivity perPage
+
+-- | Returns the full result set for an activity's comments. This interface is
+-- simpler to use but does not have the flexibility/memory usage benefit of
+-- enumComments.
+getComments :: ID -- ^ Activity ID
+              -> GooglePlusM [Comment]
+getComments aid = run_ $ enumComments aid (Just 100) $$ EL.consume
 
 -- | Specifies the type of Activities to get in an Activity listing. Currently
 -- the API only allows public.

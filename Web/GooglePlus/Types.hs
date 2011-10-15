@@ -40,9 +40,12 @@ module Web.GooglePlus.Types (Person(..),
                              Organization(..),
                              OrganizationType(..),
                              Place(..),
-                             RelationshipStatus(..)) where
+                             RelationshipStatus(..),
+                             Comment(..),
+                             CommentObject(..),
+                             InReplyTo(..)) where
 
-import           Control.Applicative ((<$>), (<*>), pure)
+import           Control.Applicative ((<$>), (<*>), pure, Applicative)
 import           Data.Aeson (Value(..),
                              Object,
                              FromJSON,
@@ -50,6 +53,7 @@ import           Data.Aeson (Value(..),
                              (.:),
                              (.:?))
 import           Data.Aeson.Types (Parser, typeMismatch)
+import           Data.List (intercalate)
 import qualified Data.Map as M
 import           Data.Time.Calendar (Day(..))
 import           Data.Time.LocalTime (ZonedTime(..), zonedTimeToUTC)
@@ -122,7 +126,7 @@ instance Eq ZonedTime where
   a == b = zonedTimeToUTC a == zonedTimeToUTC b
 
 instance FromJSON ZonedTime where
-  parseJSON (String str) = maybe (fail $ "Failed to parse ZonedTime " ++ unpack str) pure parsed
+  parseJSON (String str) = maybeToParser parsed $ "Failed to parse ZonedTime " ++ unpack str
     where parsed = readRFC3339 . unpack $ str
   parseJSON v            = typeMismatch "ZonedTime" v
 
@@ -533,11 +537,78 @@ instance FromJSON RelationshipStatus where
   parseJSON (String "in_civil_union")          = pure InCivilUnion
   parseJSON v                                  = typeMismatch "RelationshipStatus" v
 
-(.:|) :: (FromJSON a) => Object -> (Text, a) -> Parser a
+-- |Activity comment on Google+
+data Comment = Comment { commentId          :: ID,            -- ^ ID of the comment
+                         commentPublished   :: ZonedTime,     -- ^ Date originally published
+                         commentUpdated     :: ZonedTime,     -- ^ Date updated
+                         commentActor       :: Actor,         -- ^ The actor who posted the comment
+                         commentVerb        :: Verb,          -- ^ Indicates what action was performed
+                         commentObject      :: CommentObject, -- ^ The content of the object
+                         commentUrl         :: URL,           -- ^ URL to the comment
+                         commentActivities  :: [InReplyTo]    -- ^ The activities to which this comment is a reply
+                       } deriving (Show, Eq)
+
+instance FromJSON Comment where
+  parseJSON (Object v) = Comment <$> v .:  "id"
+                                 <*> v .:  "published"
+                                 <*> v .:  "updated"
+                                 <*> v .:  "actor"
+                                 <*> v .:| ("verb", Post)
+                                 <*> v .:  "object"
+                                 <*> v .:  "selfLink"
+                                 <*> v .:  "inReplyTo"
+  parseJSON v          = typeMismatch "Comment" v
+
+
+data CommentObject = CommentObject { commentObjectContent :: Text -- ^ Text content of the comments
+                                   } deriving (Show, Eq)
+
+instance FromJSON CommentObject where
+  parseJSON (Object v) = CommentObject <$> v .: "content"
+  parseJSON v          = typeMismatch "CommentObject" v
+
+data InReplyTo = InReplyTo { inReplyToId :: ID,  -- ^ ID of the article
+                             inReplyToUrl :: URL -- ^ URL of the article
+                           } deriving (Show, Eq)
+
+instance FromJSON InReplyTo where
+  parseJSON (Object v) = InReplyTo <$> v .: "id"
+                                   <*> v .: "url"
+  parseJSON v          = typeMismatch "InReplyTo" v
+
+---- Helpers
+
+(.:|) :: (FromJSON a) => Object
+                         -> (Text, a)
+                         -> Parser a
 obj .:| (key, d) = case M.lookup key obj of
                         Nothing -> pure d
                         Just v  -> parseJSON v
 
-spanSkip :: Char -> Text -> (Text, Text)
+(.:/) :: (FromJSON a) => Object
+                         -> [Text]
+                         -> Parser a
+obj .:/ (k:ks) = maybe (fail msg) parseJSON parsed
+ where parsed = deepValue ks =<< M.lookup k obj
+       msg    = "Failed to find " ++ (intercalate "/" $ map unpack (k:ks))
+obj .:/ []     = parseJSON $ Object obj
+
+deepValue :: [Text]
+             -> Value
+             -> Maybe Value
+deepValue (k:[]) (Object obj) = M.lookup k obj
+deepValue (k:[]) _            = Nothing
+deepValue (k:ks) (Object obj) = deepValue ks =<< M.lookup k obj
+deepValue (k:ks) _            = Nothing
+deepValue [] v                = Just v
+
+spanSkip :: Char
+            -> Text
+            -> (Text, Text)
 spanSkip cond xs = (left, T.tail right)
   where (left, right) = T.span (/= cond) xs
+
+maybeToParser :: (Applicative m, Monad m) => Maybe a
+                                             -> String
+                                             -> m a
+maybeToParser parsed msg = maybe (fail msg) pure parsed
