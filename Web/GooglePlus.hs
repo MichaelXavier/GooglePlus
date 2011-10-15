@@ -48,6 +48,7 @@ module Web.GooglePlus (getPerson,
                        getPeopleByActivity,
                        enumActivitySearch,
                        getActivitySearch,
+                       SearchOrderBy(..),
                        ActivityCollection(..),
                        ListByActivityCollection(..)) where
 
@@ -205,16 +206,32 @@ getPeopleByActivity :: ID                          -- ^ Activity ID
                        -> GooglePlusM [Person]
 getPeopleByActivity aid coll = run_ $ enumPeopleByActivity aid coll (Just 100) $$ EL.consume
 
-enumActivitySearch :: Text           -- ^ Search string
-                    -> Maybe Integer -- ^ Optional page size. Shold be between 1 and 20. Default 10
-                    -> Enumerator Activity GooglePlusM b
-enumActivitySearch search perPage = simpleDepaginator depaginate
-  where depaginate = simpleDepaginationStep perPage' pth params
-        pth        = "/plus/v1/activities"
-        params     = [("query", Just $ encodeUtf8 search)]
-        perPage'   = perPageSearch perPage
+enumActivitySearch :: Text             -- ^ Search string
+                      -> SearchOrderBy -- ^ Order of search results
+                      -> Maybe Integer -- ^ Optional page size. Shold be between 1 and 20. Default 10
+                      -> Enumerator Activity GooglePlusM b
+enumActivitySearch search orderBy perPage = simpleDepaginator depaginate
+  where depaginate        = simpleDepaginationStep perPage' pth params
+        pth               = "/plus/v1/activities"
+        params            = [("query", Just $ encodeUtf8 search),
+                             ("orderBy", Just $ orderParam orderBy)]
+        orderParam Best   = "best"
+        orderParam Recent = "recent"
+        perPage'          = perPageSearch perPage
 
 getActivitySearch = undefined
+
+-- | Specifies the type of Activities to get in an Activity listing. Currently
+-- the API only allows public.
+data ActivityCollection = PublicCollection deriving (Show, Eq)
+
+data ListByActivityCollection = PlusOners | -- ^ List of people who have +1ed an activity
+                                Resharers   -- ^ List of people who have reshared an activity
+                                deriving (Show, Eq)
+
+data SearchOrderBy = Best | -- ^ Sort by relevance to the to the user, most relevant first
+                     Recent -- ^ Sort by most recent results first
+                     deriving (Show, Eq)
 
 ---- Helpers
 
@@ -332,14 +349,6 @@ instance FromJSON a => FromJSON (PaginatedResource a) where
   parseJSON (Object v) = (,) <$> v .: "items"
                             <*> v .:? "nextPageToken"
   parseJSON v          = typeMismatch "PaginatedResource" v
-
--- | Specifies the type of Activities to get in an Activity listing. Currently
--- the API only allows public.
-data ActivityCollection = PublicCollection deriving (Show, Eq)
-
-data ListByActivityCollection = PlusOners | -- ^ List of people who have +1ed an activity
-                                Resharers   -- ^ List of people who have reshared an activity
-                                deriving (Show, Eq)
 
 paginatedState :: (a, Maybe PageToken)
                   -> (a, DepaginationState)
