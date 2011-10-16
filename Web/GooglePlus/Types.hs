@@ -585,23 +585,6 @@ obj .:| (key, d) = case M.lookup key obj of
                         Nothing -> pure d
                         Just v  -> parseJSON v
 
-(.:/) :: (FromJSON a) => Object
-                         -> [Text]
-                         -> Parser a
-obj .:/ (k:ks) = maybe (fail msg) parseJSON parsed
- where parsed = deepValue ks =<< M.lookup k obj
-       msg    = "Failed to find " ++ (intercalate "/" $ map unpack (k:ks))
-obj .:/ []     = parseJSON $ Object obj
-
-deepValue :: [Text]
-             -> Value
-             -> Maybe Value
-deepValue (k:[]) (Object obj) = M.lookup k obj
-deepValue (k:[]) _            = Nothing
-deepValue (k:ks) (Object obj) = deepValue ks =<< M.lookup k obj
-deepValue (k:ks) _            = Nothing
-deepValue [] v                = Just v
-
 spanSkip :: Char
             -> Text
             -> (Text, Text)

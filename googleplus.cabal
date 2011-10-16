@@ -1,13 +1,15 @@
 name: googleplus
-version: 0.2.2
-synopsis: Haskell implementation of the Google+ API
+version: 0.3.0
+synopsis: Haskell implementation of the Google+ API v1
 description:
    Will implement the Google+ REST API. Google+ is a social network made by
    Google. Found out more at <http://plus.google.com>.
 
-   Currently supports the API-key authentication only. OAuth should be coming
-   along at some point. Only features read-only API access beacuse that is all
-   that Google has published thus far.
+   Implements the full API as of Oct 15, 2011. Only features read-only API
+   access beacuse that is all that Google has published thus far. Both API and
+   OAuth authentication is supported, but note that if you intend to use OAuth,
+   this library does not currently provide the means to procure and renew OAuth
+   tokens.
 
 category:           Web
 license:            BSD3

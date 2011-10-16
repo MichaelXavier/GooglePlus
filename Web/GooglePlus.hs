@@ -146,7 +146,7 @@ getActivityFeed :: PersonID
 getActivityFeed pid coll = do
   feeds <- run_ $ enumActivityFeed pid coll (Just 100) $$ EL.consume
   return $ foldl1 mergeFeeds feeds
-  where mergeFeeds a ActivityFeed { activityFeedItems = is} = a { activityFeedItems = (activityFeedItems a) ++ is }
+  where mergeFeeds a ActivityFeed { activityFeedItems = is} = a { activityFeedItems = activityFeedItems a ++ is }
 
 -- | Paginating enumerator yielding a Chunk for each page. Use this if you
 -- don't need the feed metadata that enumActivityFeed provides.
@@ -336,14 +336,6 @@ simpleDepaginationStep perPage pth params (MorePages tok) = (return . fmap pagin
 simpleDepaginationStep _ _ _ NoMorePages = return Nothing
 
 -- Activities Specifics
-
-depaginateActivities :: PersonID
-                        -> ActivityCollection
-                        -> Integer
-                        -> DepaginationState
-                        -> GooglePlusM (Maybe ([Activity], DepaginationState))
-depaginateActivities pid coll perPage state = (return . fmap unwrap) =<< depaginateActivityFeed pid coll perPage state
-  where unwrap (feed, s) = (activityFeedItems feed, s)
 
 depaginateActivityFeed :: PersonID
                           -> ActivityCollection
