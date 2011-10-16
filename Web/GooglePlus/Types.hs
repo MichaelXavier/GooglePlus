@@ -53,7 +53,6 @@ import           Data.Aeson (Value(..),
                              (.:),
                              (.:?))
 import           Data.Aeson.Types (Parser, typeMismatch)
-import           Data.List (intercalate)
 import qualified Data.Map as M
 import           Data.Time.Calendar (Day(..))
 import           Data.Time.LocalTime (ZonedTime(..), zonedTimeToUTC)
