@@ -18,7 +18,7 @@ author:             Michael Xavier <michael@michaelxavier.net>
 maintainer:         Michael Xavier <michael@michaelxavier.net>
 cabal-version:      >= 1.6
 build-type:         Simple
-extra-source-files: README
+extra-source-files: README CHANGELOG
 homepage:           http://github.com/michaelxavier/GooglePlus
 
 library

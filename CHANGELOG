@@ -1,0 +1,30 @@
+CHANGELOG
+
+The following is a release history for the GooglePlus library for Haskell.
+
+
+0.3.1 - Oct 15, 2011
+--------------------
+* Upgraded from rfc3339 to timerep package to build with GHC 7.2. You should
+  uninstall rfc3339 as they export the same modules.
+
+0.3.0 - Oct 14, 2011
+--------------------
+* Person search
+* Comments
+* Activities enumerator (alternative to enumActivityFeed and friends). Allows
+  you to get just activities without the extraneous metadata.
+* Added simplified functions for those that do not want to use enumerators.
+
+0.2.2 - Oct 7, 2011
+--------------------
+* Make a person URL optional, as it is not always present.
+
+0.2.1 - Oct 3, 2011
+--------------------
+* Add activity feed enumerator.
+
+0.1.0 - Sep 25, 2011
+--------------------
+* Get Person
+* Get ActivityFeed
