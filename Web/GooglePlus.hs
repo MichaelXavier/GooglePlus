@@ -34,7 +34,7 @@
 -- 
 --------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeSynonymInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 module Web.GooglePlus (getPerson,
                        getActivity,
                        getComment,
