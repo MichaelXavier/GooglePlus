@@ -1,5 +1,6 @@
 CABAL = cabal
 GHC_PKG = ghc-pkg
+RUN = runhaskell
 
 all: build
 
@@ -23,3 +24,13 @@ configure: googleplus.cabal **/*.hs
 
 clean:
 	$(CABAL) clean
+
+quick_spec: Web/GooglePlus/**/*.hs
+	$(RUN) Web/GooglePlus/Testing/Main.hs
+
+spec: configure_tests
+	$(CABAL) build
+	$(CABAL) test
+
+configure_tests:
+	$(CABAL) configure --enable-tests --user
